@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🐔KFC Chicken Snake</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    min-height: 100vh;
+    background: #1a0e0a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: Arial, sans-serif;
+    padding: 10px;
+    user-select: none;
+    touch-action: manipulation;
+  }
+  .wrap {
+    background: #2a1209;
+    padding: 15px;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px #000;
+    width: 100%;
+    max-width: 440px;
+  }
+  .top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    color: #ffcf9e;
+    font-weight: bold;
+  }
+  .title { color: #ff3b2f; font-size: 15px; }
+  .title span { color: #f5c542; }
+  .stats { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  .chip {
+    background: #5c1206;
+    padding: 5px 10px;
+    border-radius: 20px;
+    color: #ffe1b3;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .chip.ammo { background: #1e3a44; color: #b7e4f0; border: 1px solid #4a8b9e; }
+  .chip.ammo.on { background: #2e7a3a; border-color: #6ee68a; color: #d6ffdc; }
+  .chip.hook { background: #3a2a5c; color: #d6c4ff; border: 1px solid #7a5cbe; }
+  .chip.hook.on { background: #6a3ac9; border-color: #b28aff; color: #fff0ff; }
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1/1;
+    background: #4a8b3a;
+    border-radius: 15px;
+    box-shadow: inset 0 0 0 3px #6b2a12;
+    touch-action: none;
+  }
+  .pad {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 12px;
+    gap: 6px;
+  }
+  .row { display: flex; gap: 8px; }
+  .btn {
+    background: #3d2a22;
+    border: 2px solid #a1472a;
+    color: #ffcf9e;
+    width: 60px;
+    height: 60px;
+    border-radius: 15px;
+    font-size: 22px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 0 #0a0503;
+    touch-action: manipulation;
+  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #0a0503; }
+  .btn.wide {
+    width: 130px;
+    height: 46px;
+    font-size: 13px;
+    background: #7a2a14;
+    border-color: #d65c36;
+    color: #ffe5c4;
+  }
+  .btn.hookbtn {
+    width: 130px;
+    height: 46px;
+    font-size: 13px;
+    background: #4a2a7a;
+    border-color: #a06ee6;
+    color: #e8d6ff;
+  }
+  .btn.hookbtn:disabled { opacity: 0.35; }
+  @media (max-width: 400px) {
+    .btn { width: 54px; height: 54px; font-size: 20px; }
+    .btn.wide, .btn.hookbtn { width: 115px; height: 42px; font-size: 12px; }
+    .title { font-size: 12px; }
+    .chip { padding: 4px 8px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="title">🐔KFC <span>CHICKEN</span></div>
+    <div class="stats">
+      <div class="chip">Egg <span id="score">0</span></div>
+      <div class="chip ammo" id="ammoBox">Gun <span id="ammo">0</span></div>
+      <div class="chip hook" id="hookBox">Hook <span id="hookCount">0</span></div>
+    </div>
+  </div>
+  <canvas id="cv" width="400" height="400"></canvas>
+  <div class="pad">
+    <div class="row"><div class="btn" data-d="UP">^</div></div>
+    <div class="row">
+      <div class="btn" data-d="LEFT">&lt;</div>
+      <div class="btn" data-d="DOWN">v</div>
+      <div class="btn" data-d="RIGHT">&gt;</div>
+    </div>
+    <div class="row">
+      <div class="btn hookbtn" id="hookBtn">USE HOOK</div>
+      <div class="btn wide" id="restart">NEW GAME</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ============ CONFIG ============
+  var SIZE = 20;
+  var CELL = 20;
+  var SPEED = 160;
+  var ENEMY_MIN_SCORE = 5;
+  var ENEMY_MOVE_EVERY = 2;
+  var BLOOD_MS = 1500;
+  var HOOK_FLY_MS = 400;
+
+  // ============ DOM ============
+  var cv = document.getElementById('cv');
+  var ctx = cv.getContext('2d');
+  var scoreEl = document.getElementById('score');
+  var ammoEl = document.getElementById('ammo');
+  var ammoBox = document.getElementById('ammoBox');
+  var hookCountEl = document.getElementById('hookCount');
+  var hookBox = document.getElementById('hookBox');
+  var hookBtn = document.getElementById('hookBtn');
+  var restartEl = document.getElementById('restart');
+
+  // ============ STATE ============
+  var snake = [];
+  var egg = null;
+  var enemy = null;
+  var gun = null;
+  var hookItem = null;
+  var dir = 'RIGHT';
+  var nextDir = 'RIGHT';
+  var score = 0;
+  var ammo = 0;
+  var hookCharges = 0;
+  var hasGun = false;
+  var dead = false;
+  var tickCount = 0;
+  var timer = null;
+  var bloods = [];
+  var activeHook = null;
+  var grass = [];
+
+  // ============ HELPERS ============
+  function rnd(n) { return Math.floor(Math.random() * n); }
+
+  function occupied(x, y, ignoreHook) {
+    var i;
+    for (i = 0; i < snake.length; i++) {
+      if (snake[i].x === x && snake[i].y === y) return true;
+    }
+    if (egg && egg.x === x && egg.y === y) return true;
+    if (enemy && enemy.x === x && enemy.y === y) return true;
+    if (gun && gun.x === x && gun.y === y) return true;
+    if (!ignoreHook && hookItem && hookItem.x === x && hookItem.y === y) return true;
+    return false;
+  }
+
+  function emptyCell() {
+    var t, x, y;
+    for (t = 0; t < 500; t++) {
+      x = rnd(SIZE); y = rnd(SIZE);
+      if (!occupied(x, y)) return { x: x, y: y };
+    }
+    for (y = 0; y < SIZE; y++) {
+      for (x = 0; x < SIZE; x++) {
+        if (!occupied(x, y)) return { x: x, y: y };
+      }
+    }
+    return null;
+  }
+
+  function makeGrass() {
+    grass = [];
+    for (var i = 0; i < 220; i++) {
+      grass.push({
+        x: Math.random() * 400,
+        y: Math.random() * 400,
+        len: 2 + Math.random() * 3,
+        shade: Math.random()
+      });
+    }
+  }
+
+  function spawnEnemy() {
+    if (!egg) return null;
+    var opts = [
+      { x: egg.x + 1, y: egg.y },
+      { x: egg.x - 1, y: egg.y },
+      { x: egg.x, y: egg.y + 1 },
+      { x: egg.x, y: egg.y - 1 }
+    ];
+    for (var i = opts.length - 1; i > 0; i--) {
+      var j = rnd(i + 1);
+      var tmp = opts[i]; opts[i] = opts[j]; opts[j] = tmp;
+    }
+    for (var k = 0; k < opts.length; k++) {
+      var c = opts[k];
+      if (c.x < 0 || c.x >= SIZE || c.y < 0 || c.y >= SIZE) continue;
+      if (egg.x === c.x && egg.y === c.y) continue;
+      var onSnake = false;
+      for (var s = 0; s < snake.length; s++) {
+        if (snake[s].x === c.x && snake[s].y === c.y) { onSnake = true; break; }
+      }
+      if (!onSnake) return { x: c.x, y: c.y };
+    }
+    return { x: egg.x + 1, y: egg.y };
+  }
+
+  function moveEnemy() {
+    if (!enemy || !egg) return;
+    var dx = enemy.x - egg.x;
+    var dy = enemy.y - egg.y;
+    var nx2, ny2;
+    if (dx === 1 && dy === 0) { nx2 = 0; ny2 = 1; }
+    else if (dx === 0 && dy === 1) { nx2 = -1; ny2 = 0; }
+    else if (dx === -1 && dy === 0) { nx2 = 0; ny2 = -1; }
+    else if (dx === 0 && dy === -1) { nx2 = 1; ny2 = 0; }
+    else { nx2 = 1; ny2 = 0; }
+    var tx = egg.x + nx2;
+    var ty = egg.y + ny2;
+    if (tx < 0 || tx >= SIZE || ty < 0 || ty >= SIZE) return;
+    if (tx === egg.x && ty === egg.y) return;
+    enemy.x = tx;
+    enemy.y = ty;
+  }
+
+  function spawnHookAt(x, y) {
+    if (x >= 0 && x < SIZE && y >= 0 && y < SIZE && !occupied(x, y)) {
+      hookItem = { x: x, y: y };
+      return;
+    }
+    var around = [
+      { x: x + 1, y: y }, { x: x - 1, y: y },
+      { x: x, y: y + 1 }, { x: x, y: y - 1 }
+    ];
+    for (var i = 0; i < around.length; i++) {
+      var c = around[i];
+      if (c.x < 0 || c.x >= SIZE || c.y < 0 || c.y >= SIZE) continue;
+      if (!occupied(c.x, c.y)) { hookItem = { x: c.x, y: c.y }; return; }
+    }
+    var e = emptyCell();
+    if (e) hookItem = e;
+  }
+
+  function addBlood(gx, gy) {
+    var cx = gx * CELL + CELL / 2;
+    var cy = gy * CELL + CELL / 2;
+    var blobs = [];
+    var count = 8 + rnd(5);
+    for (var i = 0; i < count; i++) {
+      var a = Math.random() * Math.PI * 2;
+      var d = Math.random() * 11;
+      var r = 1.5 + Math.random() * 4;
+      blobs.push({ x: cx + Math.cos(a) * d, y: cy + Math.sin(a) * d, r: r });
+    }
+    blobs.push({ x: cx, y: cy, r: 6 + Math.random() * 3 });
+    bloods.push({ blobs: blobs, start: Date.now(), dur: BLOOD_MS });
+  }
+
+  // ============ DRAW ============
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+  }
+
+  function drawGrass() {
+    ctx.fillStyle = '#4a8b3a';
+    ctx.fillRect(0, 0, 400, 400);
+    var px, py, seed;
+    for (px = 0; px < 400; px += 40) {
+      for (py = 0; py < 400; py += 40) {
+        seed = (px * 7 + py * 13) % 100;
+        if (seed < 30) ctx.fillStyle = '#528f3f';
+        else if (seed < 55) ctx.fillStyle = '#438034';
+        else ctx.fillStyle = '#4a8b3a';
+        ctx.fillRect(px, py, 40, 40);
+      }
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth = 0.5;
+    for (var i = 0; i <= SIZE; i++) {
+      var pos = i * CELL;
+      ctx.beginPath(); ctx.moveTo(pos, 0); ctx.lineTo(pos, 400); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, pos); ctx.lineTo(400, pos); ctx.stroke();
+    }
+    for (var b = 0; b < grass.length; b++) {
+      var bl = grass[b];
+      ctx.strokeStyle = bl.shade < 0.5 ? 'rgba(60,120,45,0.55)' : 'rgba(110,180,80,0.45)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(bl.x, bl.y);
+      ctx.lineTo(bl.x - 2, bl.y - bl.len);
+      ctx.moveTo(bl.x, bl.y);
+      ctx.lineTo(bl.x + 2, bl.y - bl.len);
+      ctx.stroke();
+    }
+  }
+
+  function drawBlood() {
+    var now = Date.now();
+    for (var i = bloods.length - 1; i >= 0; i--) {
+      var b = bloods[i];
+      var t = (now - b.start) / b.dur;
+      if (t >= 1) { bloods.splice(i, 1); continue; }
+      var alpha = t < 0.6 ? 1 : 1 - (t - 0.6) / 0.4;
+      var spread = 1 + Math.min(0.35, ((now - b.start) / 300) * 0.35);
+      for (var j = 0; j < b.blobs.length; j++) {
+        var bl = b.blobs[j];
+        ctx.fillStyle = 'rgba(150,10,10,' + (alpha * 0.95) + ')';
+        ctx.beginPath();
+        ctx.arc(bl.x, bl.y, bl.r * spread, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      for (var k = 0; k < b.blobs.length; k++) {
+        var cb = b.blobs[k];
+        if (cb.r > 2.5) {
+          ctx.fillStyle = 'rgba(90,0,0,' + (alpha * 0.8) + ')';
+          ctx.beginPath();
+          ctx.arc(cb.x - 0.5, cb.y - 0.5, cb.r * spread * 0.55, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+  }
+
+  function drawEgg(cx, cy) {
+    ctx.fillStyle = '#fffaf0';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 6, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(200,180,150,0.7)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath();
+    ctx.ellipse(cx - 2, cy - 3, 2, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawEnemy(cx, cy) {
+    var pulse = 1 + Math.sin(Date.now() / 120) * 0.05;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(pulse, pulse);
+    ctx.fillStyle = '#7a1f1f';
+    ctx.beginPath();
+    ctx.arc(0, 0, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#b32424';
+    for (var a = 0; a < 8; a++) {
+      var ang = (a / 8) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.arc(Math.cos(ang) * 8, Math.sin(ang) * 8, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#ffe066';
+    ctx.beginPath(); ctx.arc(-3, -2, 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(3, -2, 2.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1a0505';
+    ctx.beginPath(); ctx.arc(-3, -2, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(3, -2, 1, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#1a0505';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-5, -5); ctx.lineTo(-1, -4);
+    ctx.moveTo(5, -5); ctx.lineTo(1, -4);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawGun(cx, cy) {
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(cx - 4, cy, 4, 7);
+    ctx.fillStyle = '#555';
+    ctx.fillRect(cx - 6, cy - 4, 12, 4);
+    ctx.fillStyle = '#888';
+    ctx.fillRect(cx - 6, cy - 4, 12, 1.5);
+    ctx.strokeStyle = '#3a3a3a';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx - 1, cy + 1, 3, 0, Math.PI);
+    ctx.stroke();
+  }
+
+  function drawHookItem(cx, cy) {
+    var bob = Math.sin(Date.now() / 250) * 1.5;
+    ctx.save();
+    ctx.translate(cx, cy + bob);
+    ctx.shadowColor = '#b28aff';
+    ctx.shadowBlur = 12;
+    ctx.strokeStyle = '#e8d6ff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, -7);
+    ctx.lineTo(0, 0);
+    ctx.stroke();
+    ctx.strokeStyle = '#c4a4ff';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(0, 2, 4, Math.PI * 0.15, Math.PI * 1.1, false);
+    ctx.stroke();
+    ctx.fillStyle = '#e8d6ff';
+    ctx.beginPath();
+    ctx.moveTo(3.5, 1);
+    ctx.lineTo(5.5, -1);
+    ctx.lineTo(4, 3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  function drawActiveHook() {
+    if (!activeHook) return;
+    var t = (Date.now() - activeHook.start) / activeHook.dur;
+    if (t > 1) t = 1;
+    var ease = 1 - Math.pow(1 - t, 3);
+    var x = activeHook.fx + (activeHook.tx - activeHook.fx) * ease;
+    var y = activeHook.fy + (activeHook.ty - activeHook.fy) * ease;
+    ctx.strokeStyle = 'rgba(230,210,255,0.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(activeHook.fx, activeHook.fy);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(178,138,255,0.9)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(activeHook.fx, activeHook.fy);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.shadowColor = '#b28aff';
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = '#e8d6ff';
+    ctx.beginPath();
+    ctx.arc(0, 0, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#7a3ac9';
+    ctx.beginPath();
+    ctx.arc(0, 0, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSnake() {
+    for (var i = 0; i < snake.length; i++) {
+      var s = snake[i];
+      var x = s.x * CELL;
+      var y = s.y * CELL;
+      if (i === 0) {
+        ctx.fillStyle = hasGun ? '#ffe45c' : '#fdd835';
+      } else {
+        ctx.fillStyle = '#e8a020';
+      }
+      rr(x + 2, y + 2, CELL - 4, CELL - 4, 5);
+      ctx.fill();
+      if (i === 0) {
+        if (hasGun) {
+          ctx.strokeStyle = 'rgba(255,240,120,0.9)';
+          ctx.lineWidth = 2;
+          rr(x + 1, y + 1, CELL - 2, CELL - 2, 6);
+          ctx.stroke();
+        }
+        if (hookCharges > 0) {
+          ctx.strokeStyle = 'rgba(178,138,255,0.9)';
+          ctx.lineWidth = 1.5;
+          rr(x, y, CELL, CELL, 7);
+          ctx.stroke();
+        }
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(x + 7, y + 7, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x + 13, y + 7, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#000000';
+        ctx.beginPath(); ctx.arc(x + 7, y + 7, 1.3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x + 13, y + 7, 1.3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#f57c00';
+        ctx.beginPath();
+        ctx.moveTo(x + 10, y + 11);
+        ctx.lineTo(x + 8, y + 15);
+        ctx.lineTo(x + 12, y + 15);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#d32f2f';
+        ctx.beginPath();
+        ctx.arc(x + 10, y + 3, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  function draw() {
+    drawGrass();
+    drawBlood();
+    if (egg) drawEgg(egg.x * CELL + CELL / 2, egg.y * CELL + CELL / 2);
+    if (enemy) drawEnemy(enemy.x * CELL + CELL / 2, enemy.y * CELL + CELL / 2);
+    if (gun) drawGun(gun.x * CELL + CELL / 2, gun.y * CELL + CELL / 2);
+    if (hookItem) drawHookItem(hookItem.x * CELL + CELL / 2, hookItem.y * CELL + CELL / 2);
+    drawActiveHook();
+    drawSnake();
+  }
+
+  function renderLoop() {
+    if (!dead && (bloods.length > 0 || enemy || activeHook)) {
+      draw();
+    }
+    requestAnimationFrame(renderLoop);
+  }
+
+  // ============ UI ============
+  function updateUI() {
+    scoreEl.textContent = score;
+    ammoEl.textContent = ammo;
+    hookCountEl.textContent = hookCharges;
+    if (hasGun) ammoBox.classList.add('on'); else ammoBox.classList.remove('on');
+    if (hookCharges > 0) hookBox.classList.add('on'); else hookBox.classList.remove('on');
+    hookBtn.disabled = (hookCharges <= 0 || !egg || !!activeHook || dead);
+  }
+
+  // ============ HOOK USE ============
+  function useHook() {
+    if (dead || hookCharges <= 0 || !egg || activeHook) return;
+    var h = snake[0];
+    var fx = h.x * CELL + CELL / 2;
+    var fy = h.y * CELL + CELL / 2;
+    var tx = egg.x * CELL + CELL / 2;
+    var ty = egg.y * CELL + CELL / 2;
+    hookCharges--;
+    activeHook = {
+      fx: fx, fy: fy, tx: tx, ty: ty,
+      start: Date.now(), dur: HOOK_FLY_MS
+    };
+    updateUI();
+    if (navigator.vibrate) navigator.vibrate(20);
+
+    setTimeout(function() {
+      if (!activeHook) return;
+      activeHook = null;
+      if (dead) { updateUI(); return; }
+
+      // Move egg next to snake head
+      var hh = snake[0];
+      var tries = [
+        { x: hh.x + 1, y: hh.y },
+        { x: hh.x - 1, y: hh.y },
+        { x: hh.x, y: hh.y + 1 },
+        { x: hh.x, y: hh.y - 1 }
+      ];
+      for (var i = tries.length - 1; i > 0; i--) {
+        var j = rnd(i + 1);
+        var tmp = tries[i]; tries[i] = tries[j]; tries[j] = tmp;
+      }
+      var placed = false;
+      for (var k = 0; k < tries.length; k++) {
+        var c = tries[k];
+        if (c.x < 0 || c.x >= SIZE || c.y < 0 || c.y >= SIZE) continue;
+        var onSnake = false;
+        for (var s = 0; s < snake.length; s++) {
+          if (snake[s].x === c.x && snake[s].y === c.y) { onSnake = true; break; }
+        }
+        if (onSnake) continue;
+        if (enemy && enemy.x === c.x && enemy.y === c.y) continue;
+        egg = { x: c.x, y: c.y };
+        placed = true;
+        break;
+      }
+      if (!placed) {
+        // couldn't place adjacent — drop egg at any empty cell
+        var e = emptyCell();
+        if (e) egg = e;
+      }
+      if (enemy) enemy = spawnEnemy();
+      updateUI();
+      draw();
+    }, HOOK_FLY_MS);
+  }
+
+  // ============ TICK ============
+  function tick() {
+    if (dead) return;
+    tickCount++;
+
+    if (enemy && tickCount % ENEMY_MOVE_EVERY === 0) moveEnemy();
+
+    if (nextDir === 'UP' && dir !== 'DOWN') dir = 'UP';
+    else if (nextDir === 'DOWN' && dir !== 'UP') dir = 'DOWN';
+    else if (nextDir === 'LEFT' && dir !== 'RIGHT') dir = 'LEFT';
+    else if (nextDir === 'RIGHT' && dir !== 'LEFT') dir = 'RIGHT';
+
+    var head = snake[0];
+    var nx = head.x;
+    var ny = head.y;
+    if (dir === 'UP') ny--;
+    else if (dir === 'DOWN') ny++;
+    else if (dir === 'LEFT') nx--;
+    else if (dir === 'RIGHT') nx++;
+
+    // wall
+    if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE) {
+      gameOver('wall');
+      return;
+    }
+    // self
+    for (var i = 0; i < snake.length; i++) {
+      if (snake[i].x === nx && snake[i].y === ny) {
+        gameOver('self');
+        return;
+      }
+    }
+    // enemy
+    if (enemy && nx === enemy.x && ny === enemy.y) {
+      if (ammo > 0) {
+        ammo--;
+        hasGun = ammo > 0;
+        var ex = enemy.x;
+        var ey = enemy.y;
+        addBlood(ex, ey);
+        enemy = null;
+        spawnHookAt(ex, ey);
+        updateUI();
+        if (navigator.vibrate) navigator.vibrate([30, 20, 30]);
+      } else {
+        gameOver('enemy');
+        return;
+      }
+    }
+
+    snake.unshift({ x: nx, y: ny });
+
+    // pick gun
+    if (gun && nx === gun.x && ny === gun.y) {
+      gun = null;
+      hasGun = true;
+      ammo += 3;
+      updateUI();
+      if (navigator.vibrate) navigator.vibrate(15);
+    }
+
+    // pick hook
+    if (hookItem && nx === hookItem.x && ny === hookItem.y) {
+      hookItem = null;
+      hookCharges += 1;
+      updateUI();
+      if (navigator.vibrate) navigator.vibrate(15);
+    }
+
+    // eat egg
+    if (egg && nx === egg.x && ny === egg.y) {
+      score++;
+      if (navigator.vibrate) navigator.vibrate(10);
+      var ne = emptyCell();
+      egg = ne || null;
+      enemy = null;
+      if (score > ENEMY_MIN_SCORE && egg) enemy = spawnEnemy();
+      if (score > ENEMY_MIN_SCORE && !gun && !hasGun && Math.random() < 0.9) {
+        var gp = emptyCell();
+        if (gp) gun = gp;
+      }
+      if (score > ENEMY_MIN_SCORE && !hookItem && hookCharges === 0 && Math.random() < 0.5) {
+        var hp = emptyCell();
+        if (hp) hookItem = hp;
+      }
+    } else {
+      snake.pop();
+    }
+
+    updateUI();
+    draw();
+  }
+
+  // ============ GAME OVER ============
+  function gameOver(reason) {
+    dead = true;
+    if (timer) { clearInterval(timer); timer = null; }
+    activeHook = null;
+
+    ctx.fillStyle = 'rgba(20,10,5,0.9)';
+    ctx.fillRect(0, 0, 400, 400);
+    ctx.fillStyle = '#ffdfb0';
+    ctx.font = 'bold 26px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('GAME OVER🍗', 200, 175);
+    ctx.font = 'bold 15px Arial';
+    ctx.fillStyle = '#ffbc8c';
+    var msg = 'Tap NEW GAME';
+    if (reason === 'enemy') msg = 'The guard got you!';
+    else if (reason === 'wall') msg = 'You hit the wall.';
+    else if (reason === 'self') msg = 'You bit yourself.';
+    ctx.fillText(msg, 200, 210);
+    ctx.font = 'bold 13px Arial';
+    ctx.fillStyle = '#e0a878';
+    ctx.fillText('Eggs: ' + score, 200, 235);
+    updateUI();
+  }
+
+  // ============ START ============
+  function start() {
+    if (timer) { clearInterval(timer); timer = null; }
+
+    makeGrass();
+    bloods = [];
+    activeHook = null;
+    tickCount = 0;
+    dead = false;
+    snake = [
+      { x: 10, y: 10 },
+      { x: 9, y: 10 },
+      { x: 8, y: 10 }
+    ];
+    dir = 'RIGHT';
+    nextDir = 'RIGHT';
+    score = 0;
+    ammo = 0;
+    hookCharges = 0;
+    hasGun = false;
+    enemy = null;
+    gun = null;
+    hookItem = null;
+
+    egg = emptyCell();
+    if (!egg) egg = { x: 15, y: 10 };
+
+    updateUI();
+    draw();
+    timer = setInterval(tick, SPEED);
+  }
+
+  // ============ INPUT ============
+  function setDir(d) {
+    if (dead) return;
+    nextDir = d;
+  }
+
+  document.addEventListener('keydown', function(e) {
+    var k = e.key;
+    if (k === 'ArrowUp' || k === 'w' || k === 'W') { e.preventDefault(); setDir('UP'); }
+    else if (k === 'ArrowDown' || k === 's' || k === 'S') { e.preventDefault(); setDir('DOWN'); }
+    else if (k === 'ArrowLeft' || k === 'a' || k === 'A') { e.preventDefault(); setDir('LEFT'); }
+    else if (k === 'ArrowRight' || k === 'd' || k === 'D') { e.preventDefault(); setDir('RIGHT'); }
+    else if (k === 'h' || k === 'H') { e.preventDefault(); useHook(); }
+    else if (k === ' ') { e.preventDefault(); start(); }
+  });
+
+  var btns = document.querySelectorAll('.btn[data-d]');
+  for (var i = 0; i < btns.length; i++) {
+    (function(btn) {
+      var h = function(e) {
+        e.preventDefault();
+        setDir(btn.getAttribute('data-d'));
+      };
+      btn.addEventListener('touchstart', h, { passive: false });
+      btn.addEventListener('mousedown', h);
+    })(btns[i]);
+  }
+
+  var hookHandler = function(e) {
+    e.preventDefault();
+    useHook();
+  };
+  hookBtn.addEventListener('touchstart', hookHandler, { passive: false });
+  hookBtn.addEventListener('mousedown', hookHandler);
+
+  var restartHandler = function(e) {
+    e.preventDefault();
+    start();
+  };
+  restartEl.addEventListener('touchstart', restartHandler, { passive: false });
+  restartEl.addEventListener('mousedown', restartHandler);
+
+  var sx = 0, sy = 0;
+  cv.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    var t = e.touches[0];
+    sx = t.clientX; sy = t.clientY;
+  }, { passive: false });
+
+  cv.addEventListener('touchmove', function(e) {
+    e.preventDefault();
+  }, { passive: false });
+
+  cv.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    if (dead) return;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - sx;
+    var dy = t.clientY - sy;
+    if (Math.abs(dx) < 20 && Math.abs(dy) < 20) return;
+    if (Math.abs(dx) > Math.abs(dy)) setDir(dx > 0 ? 'RIGHT' : 'LEFT');
+    else setDir(dy > 0 ? 'DOWN' : 'UP');
+  }, { passive: false });
+
+  // prevent scroll
+  cv.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+  // ============ GO ============
+  start();
+  requestAnimationFrame(renderLoop);
+
+})();
+</script>
+</body>
+</html>

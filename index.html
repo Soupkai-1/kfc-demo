@@ -118,10 +118,14 @@
             },
         ];
 
+        // ⚙️ CHANGE THIS to the actual filename of your snake game
+        const SNAKE_GAME_URL = 'snake.html';
+
         const footerLinks = [
-            { label: 'KFC.com', icon: 'fas fa-globe' },
-            { label: 'Menu', icon: 'fas fa-utensils' },
-            { label: 'Contact', icon: 'fas fa-envelope' },
+            { label: 'Play Snake', icon: 'fas fa-gamepad', url: SNAKE_GAME_URL, external: false },
+            { label: 'KFC.com', icon: 'fas fa-globe', url: 'https://www.kfc.com', external: true },
+            { label: 'Menu', icon: 'fas fa-utensils', url: '#menu', external: false },
+            { label: 'Contact', icon: 'fas fa-envelope', url: '#contact', external: false },
         ];
 
         const state = {
@@ -146,10 +150,16 @@
                             Power by KFC_KIN_KAI.<br class="hidden sm:block">
                             Think you’ve got what it takes to impress the Colonel?
                         </p>
-                        <button data-action="start"
-                            class="bg-kfc hover:bg-kfcdark text-white font-display text-2xl tracking-widest px-10 py-4 rounded-full shadow-xl hover:shadow-2xl hover:scale-105 transition-all cursor-pointer">
-                            <i class="fas fa-drumstick-bite mr-2"></i> LET’S EAT
-                        </button>
+                        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                            <button data-action="start"
+                                class="bg-kfc hover:bg-kfcdark text-white font-display text-2xl tracking-widest px-10 py-4 rounded-full shadow-xl hover:shadow-2xl hover:scale-105 transition-all cursor-pointer">
+                                <i class="fas fa-drumstick-bite mr-2"></i> LET’S EAT
+                            </button>
+                            <a href="${SNAKE_GAME_URL}"
+                                class="bg-gray-900 hover:bg-black text-white font-display text-2xl tracking-widest px-10 py-4 rounded-full shadow-xl hover:shadow-2xl hover:scale-105 transition-all cursor-pointer inline-flex items-center justify-center">
+                                <i class="fas fa-gamepad mr-2"></i> PLAY SNAKE
+                            </a>
+                        </div>
                     </div>
                 </section>
             `;
@@ -295,6 +305,27 @@
         function renderResult() {
             const res = resultData();
             const chickenCount = Math.max(state.score, 1);
+            const isWinner = state.score === questions.length;
+
+            // Show the snake game link especially for high scorers
+            const snakeCTA = isWinner ? `
+                <div class="bg-yellow-50 border-2 border-yellow-300 rounded-2xl p-5 mb-6">
+                    <p class="font-display text-2xl text-kfc mb-2">🎮 BONUS UNLOCKED!</p>
+                    <p class="text-gray-700 mb-4">You’re a true Colonel. Now prove it in the Snake arena!</p>
+                    <a href="${SNAKE_GAME_URL}"
+                        class="inline-flex items-center justify-center bg-gray-900 hover:bg-black text-white font-display text-xl tracking-widest px-8 py-3 rounded-full shadow-xl hover:scale-105 transition-all cursor-pointer">
+                        <i class="fas fa-gamepad mr-2"></i> PLAY KFC SNAKE
+                    </a>
+                </div>
+            ` : `
+                <div class="bg-gray-50 border-2 border-gray-200 rounded-2xl p-4 mb-6">
+                    <a href="${SNAKE_GAME_URL}"
+                        class="inline-flex items-center justify-center text-gray-700 hover:text-kfc font-bold text-sm transition-colors">
+                        <i class="fas fa-gamepad mr-2"></i> Also try our KFC Snake game →
+                    </a>
+                </div>
+            `;
+
             return `
                 <section class="max-w-2xl w-full animate-pop text-center">
                     <div class="bg-white rounded-3xl border-4 border-kfc shadow-2xl p-10 sm:p-14">
@@ -304,6 +335,9 @@
                         <p class="text-5xl font-extrabold text-gray-900 mb-2">${state.score} / ${questions.length}</p>
                         <p class="text-gray-600 text-lg mb-4">${res.msg}</p>
                         <div class="text-3xl mb-8 tracking-widest" role="img" aria-label="${chickenCount} chickens">${'🍗'.repeat(chickenCount)}</div>
+
+                        ${snakeCTA}
+
                         <button data-action="restart"
                             class="bg-kfc hover:bg-kfcdark text-white font-display text-2xl tracking-widest px-10 py-4 rounded-full shadow-xl hover:scale-105 transition-all cursor-pointer">
                             <i class="fas fa-redo mr-2"></i> PLAY AGAIN
@@ -361,11 +395,21 @@
         }
 
         // ═════════════════════ MOUNT ═════════════════════
-        document.getElementById('footer-nav').innerHTML = footerLinks.map(l => `
-            <a href="#${l.label.toLowerCase()}" class="text-white/80 hover:text-white transition-colors">
+        document.getElementById('footer-nav').innerHTML = footerLinks.map(l => {
+            if (l.external) {
+                return `<a href="${l.url}" target="_blank" rel="noopener noreferrer" class="text-white/80 hover:text-white transition-colors">
+                    <i class="${l.icon} mr-1" aria-hidden="true"></i>${l.label}
+                </a>`;
+            }
+            if (l.url.startsWith('#')) {
+                return `<a href="${l.url}" data-demo-link class="text-white/80 hover:text-white transition-colors">
+                    <i class="${l.icon} mr-1" aria-hidden="true"></i>${l.label}
+                </a>`;
+            }
+            return `<a href="${l.url}" class="text-white/80 hover:text-white transition-colors">
                 <i class="${l.icon} mr-1" aria-hidden="true"></i>${l.label}
-            </a>
-        `).join('');
+            </a>`;
+        }).join('');
 
         render();
 
@@ -403,8 +447,9 @@
                 return;
             }
 
-            const link = e.target.closest('a[href^="#"]');
-            if (link) {
+            // Demo links (only for real "#" links, not external ones)
+            const demoLink = e.target.closest('a[data-demo-link]');
+            if (demoLink) {
                 e.preventDefault();
                 showToast('🔒 Demo link — but KFC.com is real. Go get some chicken!');
             }
