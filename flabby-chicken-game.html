@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <base target="_self">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flabby Chicken — Finger Lickin' Flyer</title>
+    <meta name="description" content="Play Flabby Chicken — flap your way through KFC buckets. A fun game inspired by KFC.com!">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: #e4002b;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        canvas { 
+            display: block; 
+            width: 100%; 
+            max-width: 500px;
+            height: auto;
+            aspect-ratio: 400 / 600;
+            background: linear-gradient(180deg, #87CEEB 0%, #e0f0ff 100%);
+            border-radius: 24px;
+            border: 4px solid #fff;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            touch-action: none;
+            cursor: pointer;
+            margin: 0 auto;
+            position: relative;
+        }
+        .game-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+        }
+        .header-logo {
+            font-family: 'Bebas Neue', sans-serif;
+            color: white;
+            font-size: 2.5rem;
+            letter-spacing: 0.2em;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .header-logo a {
+            color: white;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+        .header-logo a:hover { opacity: 0.85; }
+        .score-display {
+            font-family: 'Bebas Neue', sans-serif;
+            color: white;
+            font-size: 1.8rem;
+            letter-spacing: 0.15em;
+            background: rgba(0,0,0,0.2);
+            padding: 0.3rem 1.5rem;
+            border-radius: 50px;
+            backdrop-filter: blur(4px);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .shield-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            background: rgba(56, 189, 248, 0.35);
+            border: 2px solid #38bdf8;
+            border-radius: 50px;
+            padding: 0.15rem 0.75rem;
+            font-size: 1.1rem;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        .shield-indicator.active {
+            opacity: 1;
+            transform: scale(1);
+            box-shadow: 0 0 12px #38bdf8;
+        }
+        .footer-note {
+            color: rgba(255,255,255,0.8);
+            font-size: 0.85rem;
+            margin-top: 0.75rem;
+            text-align: center;
+            padding-bottom: 2rem;
+        }
+        .footer-note a {
+            color: white;
+            font-weight: 600;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+        .bucket-stripes-bg {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0 20px, transparent 20px 40px);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .game-container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 500px;
+        }
+        .kfc-badge {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            background: #e4002b;
+            color: white;
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 0.8rem;
+            padding: 0.2rem 0.8rem;
+            border-radius: 50px;
+            border: 2px solid rgba(255,255,255,0.6);
+            z-index: 5;
+            letter-spacing: 0.1em;
+            pointer-events: none;
+        }
+        .retry-btn {
+            display: none;
+            position: absolute;
+            left: 50%;
+            top: 68%;
+            transform: translate(-50%, -50%);
+            background: #e4002b;
+            color: white;
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.6rem;
+            letter-spacing: 0.15em;
+            padding: 0.7rem 2.5rem;
+            border: 3px solid white;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            z-index: 10;
+            transition: transform 0.15s, background 0.15s;
+            touch-action: manipulation;
+        }
+        .retry-btn:hover { background: #b30020; transform: translate(-50%, -50%) scale(1.05); }
+        .retry-btn:active { transform: translate(-50%, -50%) scale(0.96); }
+        .retry-btn.show { display: block; }
+
+        .scroll-ui {
+            position: fixed;
+            right: 16px;
+            bottom: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 50;
+        }
+        .scroll-btn {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: #ffffff;
+            color: #e4002b;
+            border: 3px solid #e4002b;
+            font-size: 1.4rem;
+            font-weight: 900;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+            transition: transform 0.15s, background 0.15s, color 0.15s, opacity 0.2s;
+            touch-action: manipulation;
+            user-select: none;
+            line-height: 1;
+        }
+        .scroll-btn:hover {
+            background: #e4002b;
+            color: #ffffff;
+            transform: scale(1.08);
+        }
+        .scroll-btn:active { transform: scale(0.94); }
+        .scroll-btn.hidden { opacity: 0; pointer-events: none; }
+        @media (max-width: 500px) {
+            .scroll-ui { right: 10px; bottom: 14px; }
+            .scroll-btn { width: 46px; height: 46px; font-size: 1.2rem; border-width: 2px; }
+        }
+        .info-strip {
+            max-width: 500px;
+            margin: 2rem auto 0;
+            padding: 1.25rem;
+            background: rgba(0,0,0,0.15);
+            border-radius: 20px;
+            color: #fff;
+            text-align: center;
+            backdrop-filter: blur(6px);
+        }
+        .info-strip h3 {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.5rem;
+            letter-spacing: 0.15em;
+            margin-bottom: 0.5rem;
+        }
+        .info-strip p { font-size: 0.9rem; opacity: 0.9; line-height: 1.5; }
+        .info-strip .powerup {
+            display: inline-block;
+            background: rgba(56, 189, 248, 0.25);
+            border: 1px solid #38bdf8;
+            border-radius: 8px;
+            padding: 1px 8px;
+            margin: 0 2px;
+            font-weight: 700;
+            color: #bae6fd;
+        }
+        .info-strip .night {
+            display: inline-block;
+            background: rgba(99, 102, 241, 0.25);
+            border: 1px solid #818cf8;
+            border-radius: 8px;
+            padding: 1px 8px;
+            margin: 0 2px;
+            font-weight: 700;
+            color: #c7d2fe;
+        }
+    </style>
+</head>
+<body>
+    <div class="bucket-stripes-bg" aria-hidden="true"></div>
+
+    <div class="game-wrapper">
+        <div class="header-logo">
+            <a href="https://www.kfc.com" target="_blank" rel="noopener noreferrer" id="kfc-logo-link" title="Visit KFC.com">
+                🍗 <span>KFC.COM</span>
+            </a>
+        </div>
+        <div class="game-container">
+            <div class="kfc-badge">🐔 FLABBY CHICKEN</div>
+            <canvas id="gameCanvas" width="400" height="600"></canvas>
+            <button id="retryBtn" class="retry-btn" type="button">🔄 RETRY</button>
+        </div>
+        <div class="score-display" id="scoreLabel">
+            SCORE: <span id="scoreValue">0</span>
+            <span class="shield-indicator" id="shieldIndicator">🛡️ SHIELD</span>
+        </div>
+        <div class="footer-note">
+            Click or tap to flap &nbsp;•&nbsp; Avoid the buckets &nbsp;•&nbsp; 
+            <a href="https://www.kfc.com" target="_blank" rel="noopener noreferrer">Order chicken 🍗</a>
+        </div>
+
+        <div class="info-strip">
+            <h3>HOW TO PLAY</h3>
+            <p>Tap or click to flap. Fly through the KFC buckets. Every bucket = 1 point. Hit a bucket = game over — unless you have a <span class="powerup">🛡️ SHIELD</span>!</p>
+        </div>
+        <div class="info-strip">
+            <h3>🛡️ SHIELD POWER</h3>
+            <p>Grab the floating <span class="powerup">🛡️ SHIELD</span> to become invincible for 6 seconds. <strong>Fly straight into a bucket to SMASH it!</strong> You can destroy as many buckets as you can reach before the shield expires.</p>
+        </div>
+        <div class="info-strip">
+            <h3>🌙 NIGHT MODE</h3>
+            <p>Reach score <span class="night">5</span> and the sky turns to night — moon, stars, and all!</p>
+        </div>
+    </div>
+
+    <div class="scroll-ui" aria-label="Page scroll controls">
+        <button type="button" class="scroll-btn" id="scrollUpBtn" aria-label="Scroll up" title="Scroll up">▲</button>
+        <button type="button" class="scroll-btn" id="scrollDownBtn" aria-label="Scroll down" title="Scroll down">▼</button>
+    </div>
+
+    <script>
+        // ═════════════════════ FLABBY CHICKEN — FULL GAME ═════════════════════
+        (function() {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const scoreSpan = document.getElementById('scoreValue');
+            const retryBtn = document.getElementById('retryBtn');
+            const shieldIndicator = document.getElementById('shieldIndicator');
+
+            // ─── SCROLL UI ───
+            const scrollUpBtn = document.getElementById('scrollUpBtn');
+            const scrollDownBtn = document.getElementById('scrollDownBtn');
+            function scrollUp() { window.scrollBy({ top: -window.innerHeight * 0.8, behavior: 'smooth' }); }
+            function scrollDown() { window.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' }); }
+            scrollUpBtn.addEventListener('click', function(e) { e.preventDefault(); scrollUp(); });
+            scrollDownBtn.addEventListener('click', function(e) { e.preventDefault(); scrollDown(); });
+            function updateScrollButtons() {
+                const doc = document.documentElement;
+                const scrollTop = window.pageYOffset || doc.scrollTop;
+                const maxScroll = (doc.scrollHeight - window.innerHeight);
+                if (maxScroll < 10) {
+                    scrollUpBtn.classList.add('hidden');
+                    scrollDownBtn.classList.add('hidden');
+                    return;
+                }
+                scrollUpBtn.classList.toggle('hidden', scrollTop <= 5);
+                scrollDownBtn.classList.toggle('hidden', scrollTop >= maxScroll - 5);
+            }
+            window.addEventListener('scroll', updateScrollButtons, { passive: true });
+            window.addEventListener('resize', updateScrollButtons);
+            setTimeout(updateScrollButtons, 100);
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'PageUp' || (e.key === 'ArrowUp' && e.shiftKey)) { e.preventDefault(); scrollUp(); }
+                else if (e.key === 'PageDown' || (e.key === 'ArrowDown' && e.shiftKey)) { e.preventDefault(); scrollDown(); }
+            });
+
+            // ─── CONSTANTS ───
+            const W = 400, H = 600;
+            const GRAVITY = 0.5;
+            const JUMP = -8.5;
+            const PIPE_W = 60;
+            const PIPE_GAP = 180;
+            const PIPE_SPEED = 3.5;
+            const PIPE_SPAWN_INTERVAL = 95;
+            const NIGHT_SCORE = 5;
+            const SHIELD_DURATION = 6000;
+
+            // ⚡ DROP RATE: chance (0–1) that a newly spawned PIPE will carry a shield power-up.
+            // 0.15 = 15% of pipes will have a shield attached.
+            const POWERUP_DROP_CHANCE = 0.15;
+
+            // ─── STATE ───
+            let gameActive = false;
+            let score = 0;
+            let frame = 0;
+            let pipes = [];
+            let chicken = { x: 80, y: H/2, vy: 0, r: 22 };
+            let particleEffects = [];
+            let animationId = null;
+            let startFlag = true;
+            let debrisPieces = [];
+
+            // Power-up & shield
+            let powerup = null;
+            let hasShield = false;
+            let shieldExpiresAt = 0;
+            let shieldHitFlash = 0;
+
+            // Day/night
+            let isNight = false;
+            let dayNightMix = 0;
+
+            // ─── CHICKEN SPRITE ───
+            function drawChicken(x, y, r, angle) {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(angle);
+
+                const grad = ctx.createRadialGradient(-4, -6, 2, 0, 0, r+2);
+                grad.addColorStop(0, '#f5c542');
+                grad.addColorStop(0.7, '#dc9c2a');
+                grad.addColorStop(1, '#b87f1e');
+                ctx.beginPath();
+                ctx.arc(0, 0, r, 0, Math.PI*2);
+                ctx.fillStyle = grad;
+                ctx.fill();
+                ctx.strokeStyle = '#8b6914';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                const wingY = Math.sin(frame * 0.2) * 4 - 2;
+                ctx.beginPath();
+                ctx.ellipse(-8, 2 + wingY, 10, 7, -0.3, 0, Math.PI*2);
+                ctx.fillStyle = '#d4942a';
+                ctx.fill();
+                ctx.strokeStyle = '#a6731a';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(8, -5, 7, 0, Math.PI*2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.arc(10, -5, 3.8, 0, Math.PI*2);
+                ctx.fillStyle = '#222';
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(12, -8, 1.8, 0, Math.PI*2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.moveTo(15, -1);
+                ctx.lineTo(26, 1);
+                ctx.lineTo(15, 4);
+                ctx.closePath();
+                ctx.fillStyle = '#f97316';
+                ctx.fill();
+                ctx.strokeStyle = '#b45309';
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(-2, -r - 2);
+                ctx.quadraticCurveTo(-6, -r - 12, 0, -r - 10);
+                ctx.quadraticCurveTo(4, -r - 18, 8, -r - 10);
+                ctx.quadraticCurveTo(14, -r - 14, 12, -r - 4);
+                ctx.fillStyle = '#dc2626';
+                ctx.fill();
+                ctx.strokeStyle = '#991b1b';
+                ctx.lineWidth = 1.2;
+                ctx.stroke();
+
+                ctx.restore();
+
+                // SHIELD AURA
+                if (hasShield) {
+                    const pulse = 1 + Math.sin(frame * 0.15) * 0.06;
+                    const timeLeft = Math.max(0, shieldExpiresAt - Date.now());
+                    const fade = Math.min(1, timeLeft / 1000);
+                    ctx.save();
+                    ctx.translate(x, y);
+                    ctx.strokeStyle = 'rgba(56, 189, 248, ' + (0.85 * fade) + ')';
+                    ctx.lineWidth = 3;
+                    ctx.shadowColor = '#38bdf8';
+                    ctx.shadowBlur = 20;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, r * 1.35 * pulse, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    ctx.fillStyle = 'rgba(56, 189, 248, ' + (0.12 * fade) + ')';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, r * 1.35 * pulse, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    var ang = (frame * 0.08) % (Math.PI * 2);
+                    var sx = Math.cos(ang) * r * 1.35 * pulse;
+                    var sy = Math.sin(ang) * r * 1.35 * pulse;
+                    ctx.fillStyle = 'rgba(190, 240, 255, ' + (0.9 * fade) + ')';
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // SHIELD HIT FLASH
+                if (shieldHitFlash > 0) {
+                    const t = shieldHitFlash / 20;
+                    ctx.save();
+                    ctx.translate(x, y);
+                    ctx.strokeStyle = 'rgba(190, 240, 255, ' + t + ')';
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, r * 1.5 + (1 - t) * 30, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+
+            // ─── BUCKET (FIXED) ───
+            // Now always draws the real red gradient — no invisible bottom half.
+            function drawBucket(x, topH, bottomY, bottomH) {
+                ctx.save();
+
+                // Build the gradient once and reuse for both halves
+                const bucketGrad = ctx.createLinearGradient(x, 0, x + PIPE_W, 0);
+                bucketGrad.addColorStop(0, '#e4002b');
+                bucketGrad.addColorStop(0.5, '#ff1a3d');
+                bucketGrad.addColorStop(1, '#cc0026');
+
+                // ── TOP BUCKET ──
+                ctx.fillStyle = bucketGrad;
+                ctx.shadowColor = 'rgba(0,0,0,0.15)';
+                ctx.shadowBlur = 8;
+                ctx.shadowOffsetY = 2;
+                ctx.beginPath();
+                ctx.roundRect(x, 0, PIPE_W, topH, [0, 0, 6, 6]);
+                ctx.fill();
+
+                // White stripe near the bottom of the top bucket
+                ctx.fillStyle = 'rgba(255,255,255,0.15)';
+                ctx.beginPath();
+                ctx.roundRect(x + 8, topH - 16, PIPE_W - 16, 8, 4);
+                ctx.fill();
+
+                // KFC label on top
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                ctx.font = 'bold 12px "Inter", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('KFC', x + PIPE_W / 2, topH / 2 + 5);
+
+                // Handle on top bucket
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(x + PIPE_W / 2, topH - 4, 12, 0.2, Math.PI - 0.2, false);
+                ctx.stroke();
+
+                // ── BOTTOM BUCKET ──
+                ctx.fillStyle = bucketGrad;
+                ctx.shadowColor = 'rgba(0,0,0,0.15)';
+                ctx.shadowBlur = 8;
+                ctx.shadowOffsetY = 2;
+                ctx.beginPath();
+                ctx.roundRect(x, bottomY, PIPE_W, bottomH, [6, 6, 0, 0]);
+                ctx.fill();
+
+                // White stripe near the top of the bottom bucket
+                ctx.fillStyle = 'rgba(255,255,255,0.15)';
+                ctx.beginPath();
+                ctx.roundRect(x + 8, bottomY, PIPE_W - 16, 8, 4);
+                ctx.fill();
+
+                // KFC label on bottom
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                ctx.fillText('KFC', x + PIPE_W / 2, bottomY + bottomH / 2 + 5);
+
+                // Handle on bottom bucket
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(x + PIPE_W / 2, bottomY + 4, 12, -Math.PI + 0.2, -0.2, false);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            function drawPowerup(p) {
+                const bob = Math.sin(p.bob) * 5;
+                const cx = p.x;
+                const cy = p.y + bob;
+                const glow = 0.6 + Math.sin(p.bob * 1.5) * 0.25;
+
+                ctx.save();
+                ctx.shadowColor = '#38bdf8';
+                ctx.shadowBlur = 24 * glow;
+
+                const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 18);
+                grad.addColorStop(0, 'rgba(190, 240, 255, 0.95)');
+                grad.addColorStop(0.6, 'rgba(56, 189, 248, 0.75)');
+                grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.shadowBlur = 8;
+                ctx.font = '22px "Inter", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('🛡️', cx, cy + 1);
+                ctx.restore();
+            }
+
+            // ─── PARTICLES ───
+            function addParticles(x, y, count, color) {
+                for (let i = 0; i < count; i++) {
+                    particleEffects.push({
+                        x, y,
+                        vx: (Math.random() - 0.5) * 8,
+                        vy: -Math.random() * 6 - 2,
+                        life: 1,
+                        size: Math.random() * 8 + 3,
+                        color: color || '#ffcc00',
+                    });
+                }
+            }
+
+            function updateParticles() {
+                for (let i = particleEffects.length - 1; i >= 0; i--) {
+                    const p = particleEffects[i];
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.vy += 0.2;
+                    p.life -= 0.02;
+                    if (p.life <= 0) particleEffects.splice(i, 1);
+                }
+            }
+
+            function drawParticles() {
+                for (const p of particleEffects) {
+                    ctx.globalAlpha = p.life;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI*2);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1;
+            }
+
+            // ─── DEBRIS ───
+            function addDebris(pipe) {
+                const piecesPerBucket = 6;
+                const types = ['top', 'bottom'];
+                for (const type of types) {
+                    const x = pipe.x;
+                    const yStart = type === 'top' ? 0 : pipe.bottomY;
+                    const h = type === 'top' ? pipe.topH : pipe.bottomH;
+                    for (let i = 0; i < piecesPerBucket; i++) {
+                        const py = yStart + (h / piecesPerBucket) * i + Math.random() * 4;
+                        debrisPieces.push({
+                            x: x + 4 + Math.random() * (PIPE_W - 8),
+                            y: py,
+                            w: 8 + Math.random() * 18,
+                            h: 10 + Math.random() * 20,
+                            vx: (Math.random() - 0.5) * 6 - 1,
+                            vy: -Math.random() * 5 - 1,
+                            rot: Math.random() * Math.PI * 2,
+                            rotSpeed: (Math.random() - 0.5) * 0.3,
+                            life: 1,
+                            color: Math.random() < 0.5 ? '#e4002b' : '#ff1a3d',
+                        });
+                    }
+                }
+            }
+
+            function updateDebris() {
+                for (let i = debrisPieces.length - 1; i >= 0; i--) {
+                    const d = debrisPieces[i];
+                    d.x += d.vx;
+                    d.y += d.vy;
+                    d.vy += 0.35;
+                    d.rot += d.rotSpeed;
+                    d.life -= 0.012;
+                    if (d.life <= 0) debrisPieces.splice(i, 1);
+                }
+            }
+
+            function drawDebris() {
+                for (const d of debrisPieces) {
+                    ctx.save();
+                    ctx.globalAlpha = d.life;
+                    ctx.translate(d.x, d.y);
+                    ctx.rotate(d.rot);
+                    ctx.fillStyle = d.color;
+                    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+                    ctx.shadowBlur = 6;
+                    ctx.fillRect(-d.w / 2, -d.h / 2, d.w, d.h);
+                    ctx.restore();
+                }
+                ctx.globalAlpha = 1;
+            }
+
+            // ─── BACKGROUND ───
+            function lerp(a, b, t) { return a + (b - a) * t; }
+            function lerpColor(c1, c2, t) {
+                return [
+                    Math.round(lerp(c1[0], c2[0], t)),
+                    Math.round(lerp(c1[1], c2[1], t)),
+                    Math.round(lerp(c1[2], c2[2], t))
+                ];
+            }
+            function rgb(c) { return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')'; }
+
+            const DAY_TOP = [135, 206, 235];
+            const DAY_MID = [184, 224, 247];
+            const DAY_BOT = [232, 244, 255];
+            const DAY_GROUND1 = [126, 200, 80];
+            const DAY_GROUND2 = [93, 168, 55];
+            const DAY_TUFT = [74, 143, 46];
+
+            const NIGHT_TOP = [10, 15, 46];
+            const NIGHT_MID = [30, 41, 82];
+            const NIGHT_BOT = [60, 70, 110];
+            const NIGHT_GROUND1 = [30, 60, 35];
+            const NIGHT_GROUND2 = [20, 40, 25];
+            const NIGHT_TUFT = [12, 28, 16];
+
+            function drawBackground() {
+                const t = dayNightMix;
+                const top = rgb(lerpColor(DAY_TOP, NIGHT_TOP, t));
+                const mid = rgb(lerpColor(DAY_MID, NIGHT_MID, t));
+                const bot = rgb(lerpColor(DAY_BOT, NIGHT_BOT, t));
+
+                const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+                skyGrad.addColorStop(0, top);
+                skyGrad.addColorStop(0.7, mid);
+                skyGrad.addColorStop(1, bot);
+                ctx.fillStyle = skyGrad;
+                ctx.fillRect(0, 0, W, H);
+
+                if (t > 0.05) {
+                    const starAlpha = t;
+                    const stars = [
+                        [30, 40], [80, 90], [140, 30], [200, 70], [260, 45],
+                        [320, 100], [370, 60], [50, 150], [110, 130], [180, 160],
+                        [240, 120], [300, 180], [360, 140], [20, 220], [90, 250],
+                        [150, 210], [220, 240], [280, 200], [340, 260], [390, 220],
+                        [60, 320], [130, 300], [190, 340], [250, 310], [310, 350],
+                        [370, 320], [40, 400], [110, 380], [170, 420], [240, 400],
+                    ];
+                    for (let i = 0; i < stars.length; i++) {
+                        const s = stars[i];
+                        const tw = 0.6 + Math.sin(frame * 0.05 + i) * 0.4;
+                        ctx.globalAlpha = starAlpha * tw;
+                        ctx.fillStyle = '#fff';
+                        ctx.beginPath();
+                        ctx.arc(s[0], s[1], 1.6, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.globalAlpha = 1;
+                }
+
+                if (t > 0.05) {
+                    ctx.save();
+                    ctx.globalAlpha = t;
+                    const moonX = 320, moonY = 80;
+                    const moonGrad = ctx.createRadialGradient(moonX, moonY, 4, moonX, moonY, 42);
+                    moonGrad.addColorStop(0, 'rgba(255, 250, 220, 0.9)');
+                    moonGrad.addColorStop(0.4, 'rgba(255, 245, 200, 0.25)');
+                    moonGrad.addColorStop(1, 'rgba(255, 245, 200, 0)');
+                    ctx.fillStyle = moonGrad;
+                    ctx.beginPath();
+                    ctx.arc(moonX, moonY, 42, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#fff8dc';
+                    ctx.beginPath();
+                    ctx.arc(moonX, moonY, 16, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = 'rgba(220, 215, 180, 0.7)';
+                    ctx.beginPath(); ctx.arc(moonX - 5, moonY - 4, 3, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(moonX + 6, moonY + 3, 2.2, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(moonX - 2, moonY + 7, 1.8, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                }
+
+                if (t < 0.95) {
+                    ctx.save();
+                    ctx.globalAlpha = (1 - t) * 0.9;
+                    const sunX = 330, sunY = 80;
+                    const sunGrad = ctx.createRadialGradient(sunX, sunY, 5, sunX, sunY, 55);
+                    sunGrad.addColorStop(0, 'rgba(255, 230, 100, 0.9)');
+                    sunGrad.addColorStop(0.4, 'rgba(255, 210, 80, 0.3)');
+                    sunGrad.addColorStop(1, 'rgba(255, 200, 60, 0)');
+                    ctx.fillStyle = sunGrad;
+                    ctx.beginPath();
+                    ctx.arc(sunX, sunY, 55, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#ffe45c';
+                    ctx.beginPath();
+                    ctx.arc(sunX, sunY, 18, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                ctx.fillStyle = 'rgba(255,255,255,' + (0.6 * (1 - t) + 0.15 * t) + ')';
+                const cloudOff1 = (frame * 0.2) % 150;
+                const cloudOff2 = (frame * 0.15 + 80) % 150;
+                ctx.beginPath();
+                ctx.arc(50 - cloudOff1, 80, 30, 0, Math.PI*2);
+                ctx.arc(85 - cloudOff1, 75, 25, 0, Math.PI*2);
+                ctx.arc(115 - cloudOff1, 85, 22, 0, Math.PI*2);
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(280 - cloudOff2, 130, 28, 0, Math.PI*2);
+                ctx.arc(315 - cloudOff2, 125, 22, 0, Math.PI*2);
+                ctx.arc(340 - cloudOff2, 135, 20, 0, Math.PI*2);
+                ctx.fill();
+
+                ctx.fillStyle = rgb(lerpColor(DAY_GROUND1, NIGHT_GROUND1, t));
+                ctx.fillRect(0, H - 30, W, 30);
+                ctx.fillStyle = rgb(lerpColor(DAY_GROUND2, NIGHT_GROUND2, t));
+                ctx.fillRect(0, H - 30, W, 6);
+
+                ctx.fillStyle = rgb(lerpColor(DAY_TUFT, NIGHT_TUFT, t));
+                for (let i = 0; i < 12; i++) {
+                    const gx = (i * 35 + frame * 0.5) % 420 - 20;
+                    ctx.beginPath();
+                    ctx.moveTo(gx, H - 30);
+                    ctx.lineTo(gx + 6, H - 38);
+                    ctx.lineTo(gx + 12, H - 30);
+                    ctx.fill();
+                }
+            }
+
+            // ─── GAME LOGIC ───
+            // ⚡ Power-up now spawns WITH the pipe (rolls once per pipe), not every frame.
+            function spawnPipe() {
+                const minTop = 60;
+                const maxTop = H - PIPE_GAP - 60;
+                const topH = Math.floor(Math.random() * (maxTop - minTop) + minTop);
+                const bottomY = topH + PIPE_GAP;
+                const bottomH = H - bottomY;
+
+                // Roll for a power-up attached to THIS pipe
+                let attachedPowerup = null;
+                if (Math.random() < POWERUP_DROP_CHANCE) {
+                    attachedPowerup = {
+                        // Sit in the middle of the gap, just ahead of the pipe
+                        x: W + PIPE_W / 2,
+                        y: topH + PIPE_GAP / 2,
+                        type: 'shield',
+                        bob: Math.random() * Math.PI * 2,
+                    };
+                }
+
+                pipes.push({
+                    x: W,
+                    topH,
+                    bottomY,
+                    bottomH,
+                    scored: false,
+                    hasPowerup: !!attachedPowerup
+                });
+
+                if (attachedPowerup) {
+                    powerup = attachedPowerup;
+                }
+            }
+
+            function activateShield() {
+                hasShield = true;
+                shieldExpiresAt = Date.now() + SHIELD_DURATION;
+                shieldIndicator.classList.add('active');
+                if (navigator.vibrate) navigator.vibrate(20);
+                addParticles(chicken.x, chicken.y, 18, '#38bdf8');
+            }
+
+            function deactivateShield() {
+                hasShield = false;
+                shieldIndicator.classList.remove('active');
+            }
+
+            function resetGame() {
+                gameActive = true;
+                startFlag = false;
+                score = 0;
+                frame = 0;
+                pipes = [];
+                particleEffects = [];
+                debrisPieces = [];
+                chicken.y = H/2;
+                chicken.vy = 0;
+                scoreSpan.textContent = '0';
+                retryBtn.classList.remove('show');
+                powerup = null;
+                hasShield = false;
+                shieldIndicator.classList.remove('active');
+                shieldHitFlash = 0;
+                isNight = false;
+                dayNightMix = 0;
+                spawnPipe();
+            }
+
+            function flap() {
+                if (startFlag || !gameActive) {
+                    resetGame();
+                    return;
+                }
+                chicken.vy = JUMP;
+                addParticles(chicken.x - 10, chicken.y + 5, 6, '#ffd966');
+            }
+
+            function getHitPipe() {
+                const cx = chicken.x, cy = chicken.y, r = chicken.r - 4;
+                for (let i = 0; i < pipes.length; i++) {
+                    const p = pipes[i];
+                    if (cx + r > p.x && cx - r < p.x + PIPE_W) {
+                        if (cy - r < p.topH || cy + r > p.bottomY) {
+                            return p;
+                        }
+                    }
+                }
+                return null;
+            }
+
+            function checkBoundaryCollision() {
+                const cy = chicken.y, r = chicken.r - 4;
+                return (cy - r < 0 || cy + r > H - 30);
+            }
+
+            function updateGame() {
+                if (!gameActive) return;
+
+                chicken.vy += GRAVITY;
+                chicken.y += chicken.vy;
+
+                if (hasShield && Date.now() > shieldExpiresAt) {
+                    deactivateShield();
+                }
+                if (shieldHitFlash > 0) shieldHitFlash--;
+
+                // Day/night transition
+                const targetMix = (score >= NIGHT_SCORE) ? 1 : 0;
+                if (Math.abs(dayNightMix - targetMix) > 0.001) {
+                    dayNightMix += (targetMix - dayNightMix) * 0.02;
+                } else {
+                    dayNightMix = targetMix;
+                }
+                isNight = (dayNightMix > 0.5);
+
+                // Move pipes
+                for (let i = pipes.length - 1; i >= 0; i--) {
+                    pipes[i].x -= PIPE_SPEED;
+                    if (!pipes[i].scored && pipes[i].x + PIPE_W < chicken.x) {
+                        pipes[i].scored = true;
+                        score++;
+                        scoreSpan.textContent = score;
+                        addParticles(chicken.x + 20, chicken.y - 10, 12, '#ffdd00');
+                    }
+                    if (pipes[i].x + PIPE_W < -20) pipes.splice(i, 1);
+                }
+
+                if (frame % PIPE_SPAWN_INTERVAL === 0 && frame > 10) spawnPipe();
+
+                // Power-up drift + pickup
+                if (powerup) {
+                    powerup.x -= PIPE_SPEED;
+                    powerup.bob += 0.08;
+                    if (powerup.x < -30) {
+                        powerup = null;
+                    } else {
+                        const dx = chicken.x - powerup.x;
+                        const dy = chicken.y - powerup.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < chicken.r + 16) {
+                            activateShield();
+                            addParticles(powerup.x, powerup.y, 14, '#bae6fd');
+                            powerup = null;
+                        }
+                    }
+                }
+
+                // ─── COLLISION ───
+                const hitPipe = getHitPipe();
+                if (hitPipe) {
+                    if (hasShield) {
+                        const idx = pipes.indexOf(hitPipe);
+                        if (idx >= 0) {
+                            addDebris(hitPipe);
+                            pipes.splice(idx, 1);
+                        }
+                        deactivateShield();
+                        shieldHitFlash = 20;
+                        addParticles(chicken.x, chicken.y, 24, '#bae6fd');
+                        addParticles(chicken.x, chicken.y, 12, '#38bdf8');
+                        if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
+                        chicken.vy = JUMP * 0.5;
+                    } else {
+                        const cx = chicken.x, cy = chicken.y;
+                        addParticles(cx, cy, 30, '#e4002b');
+                        addParticles(cx, cy, 20, '#ffcc00');
+                        gameActive = false;
+                        retryBtn.classList.add('show');
+                    }
+                }
+
+                if (checkBoundaryCollision()) {
+                    if (hasShield) {
+                        deactivateShield();
+                        shieldHitFlash = 20;
+                        addParticles(chicken.x, chicken.y, 20, '#bae6fd');
+                        if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
+                        if (chicken.y + (chicken.r - 4) > H - 30) {
+                            chicken.y = H - 30 - (chicken.r - 4) - 2;
+                            chicken.vy = JUMP * 0.7;
+                        } else if (chicken.y - (chicken.r - 4) < 0) {
+                            chicken.y = (chicken.r - 4) + 2;
+                            chicken.vy = 2;
+                        }
+                    } else {
+                        const cx = chicken.x, cy = chicken.y;
+                        addParticles(cx, cy, 30, '#e4002b');
+                        addParticles(cx, cy, 20, '#ffcc00');
+                        gameActive = false;
+                        retryBtn.classList.add('show');
+                    }
+                }
+
+                frame++;
+            }
+
+            function render() {
+                ctx.clearRect(0, 0, W, H);
+                drawBackground();
+
+                ctx.fillStyle = isNight ? '#1e3c23' : '#5da837';
+                ctx.fillRect(0, H - 30, W, 30);
+                ctx.fillStyle = isNight ? '#0f1f12' : '#3d7a22';
+                ctx.fillRect(0, H - 30, W, 3);
+
+                for (const p of pipes) drawBucket(p.x, p.topH, p.bottomY, p.bottomH);
+
+                if (powerup) drawPowerup(powerup);
+                drawDebris();
+
+                const angle = gameActive ? Math.min(Math.max(chicken.vy * 0.06, -0.5), 0.8) : 0.4;
+                drawChicken(chicken.x, chicken.y, chicken.r, angle);
+                drawParticles();
+
+                if (startFlag) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                    ctx.fillRect(0, 0, W, H);
+                    ctx.font = 'bold 48px "Bebas Neue", sans-serif';
+                    ctx.fillStyle = '#fff';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                    ctx.shadowBlur = 16;
+                    ctx.fillText('FLABBY CHICKEN', W/2, H/2 - 50);
+                    ctx.font = '20px "Inter", sans-serif';
+                    ctx.fillText('Click or tap to start', W/2, H/2 + 20);
+                    ctx.shadowBlur = 0;
+                    drawChicken(W/2 + 60, H/2 + 80, 18, 0);
+                }
+
+                if (!gameActive && !startFlag) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+                    ctx.fillRect(0, 0, W, H);
+                    ctx.font = 'bold 52px "Bebas Neue", sans-serif';
+                    ctx.fillStyle = '#e4002b';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowColor = 'rgba(255,255,255,0.6)';
+                    ctx.shadowBlur = 20;
+                    ctx.fillText('GAME OVER', W/2, H/2 - 60);
+                    ctx.shadowBlur = 0;
+                    ctx.font = '28px "Bebas Neue", sans-serif';
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText('Score: ' + score, W/2, H/2 - 10);
+                    ctx.font = '16px "Inter", sans-serif';
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText('Tap anywhere or press RETRY', W/2, H/2 + 40);
+                    ctx.font = '14px "Inter", sans-serif';
+                    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                    ctx.fillText('Tap KFC.com above to visit the real site!', W/2, H - 60);
+                }
+            }
+
+            function gameLoop() {
+                if (gameActive) updateGame();
+                if (!gameActive) {
+                    if (shieldHitFlash > 0) shieldHitFlash--;
+                    const targetMix = (score >= NIGHT_SCORE) ? 1 : 0;
+                    if (Math.abs(dayNightMix - targetMix) > 0.001) {
+                        dayNightMix += (targetMix - dayNightMix) * 0.05;
+                    }
+                }
+                updateParticles();
+                updateDebris();
+                render();
+                animationId = requestAnimationFrame(gameLoop);
+            }
+
+            if (!CanvasRenderingContext2D.prototype.roundRect) {
+                CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, radii) {
+                    let r = Array.isArray(radii) ? radii : [radii, radii, radii, radii];
+                    if (r.length === 1) r = [r[0], r[0], r[0], r[0]];
+                    if (r.length === 2) r = [r[0], r[0], r[1], r[1]];
+                    if (r.length === 3) r = [r[0], r[1], r[1], r[2]];
+                    const [tl, tr, br, bl] = r.map(v => Math.min(v || 0, Math.min(w, h) / 2));
+                    this.moveTo(x + tl, y);
+                    this.lineTo(x + w - tr, y);
+                    this.quadraticCurveTo(x + w, y, x + w, y + tr);
+                    this.lineTo(x + w, y + h - br);
+                    this.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
+                    this.lineTo(x + bl, y + h);
+                    this.quadraticCurveTo(x, y + h, x, y + h - bl);
+                    this.lineTo(x, y + tl);
+                    this.quadraticCurveTo(x, y, x + tl, y);
+                    this.closePath();
+                    return this;
+                };
+            }
+
+            function handleInteraction(e) {
+                e.preventDefault();
+                flap();
+            }
+            canvas.addEventListener('click', handleInteraction);
+            canvas.addEventListener('touchstart', handleInteraction, { passive: false });
+
+            retryBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                resetGame();
+            });
+            retryBtn.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                resetGame();
+            }, { passive: false });
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === ' ' || e.key === 'Space') {
+                    e.preventDefault();
+                    flap();
+                }
+            });
+
+            gameLoop();
+        })();
+    </script>
+</body>
+</html>
